@@ -6,6 +6,7 @@ package main
 
 import (
 	"os"
+	// "log"
   "fmt"
 	"github.com/jroimartin/gocui"
 )
@@ -244,7 +245,9 @@ func (c *CanbusClient) initChannel(v *gocui.View) {
     entry := <- ch
     copy(buf[0:], entry)
 
-		v.Write(buf)
+		log.Println(buf)
+
+		fmt.Fprintf(v, "%+v", buf)
   }
 }
 
@@ -253,6 +256,14 @@ func main() {
 	var err error
 	// var port string
 	// flag.StringVar(&port, "port", "", "USB port Canbus Triple is connected to")
+
+	f, err := os.OpenFile("./canbustriple.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+	    panic(fmt.Sprintf("error opening file: %v", err))
+	}
+	defer f.Close()
+
+	log.SetOutput(f)
 
 	var port = os.Args[1]
 

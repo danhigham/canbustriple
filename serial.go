@@ -37,8 +37,22 @@ func (c *TripleClient) ensureConnection() {
 }
 
 func (c* TripleClient) OpenChannel() chan []byte {
-  var channel = make(chan []byte)
+  c.ensureConnection()
 
+  var channel = make(chan []byte)
+  go func() {
+
+    for {
+      buf := make([]byte, 16)
+      _, err := c.port.Read(buf)
+
+      if err != nil {
+        panic(err)
+      }
+
+      channel <- buf
+    }
+  }()
   return channel
 }
 
