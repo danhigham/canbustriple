@@ -6,7 +6,7 @@ package main
 
 import (
 	"os"
-	// "log"
+	"log"
   "fmt"
 	"github.com/jroimartin/gocui"
 )
@@ -240,14 +240,14 @@ func (c *CanbusClient) initChannel(v *gocui.View) {
 	ch := c.TripleClient.OpenChannel()
 
 	for {
-		buf := make([]byte, 16)
+		buf := make([]byte, 64)
 
     entry := <- ch
     copy(buf[0:], entry)
 
 		log.Println(buf)
 
-		fmt.Fprintf(v, "%+v", buf)
+		// fmt.Fprintf(v, "%+v", buf)
   }
 }
 

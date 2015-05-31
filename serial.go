@@ -43,7 +43,7 @@ func (c* TripleClient) OpenChannel() chan []byte {
   go func() {
 
     for {
-      buf := make([]byte, 16)
+      buf := make([]byte, 64)
       _, err := c.port.Read(buf)
 
       if err != nil {
