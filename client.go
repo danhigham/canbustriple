@@ -17,6 +17,7 @@ type CanbusClient struct {
   mainView    	*gocui.View
   options     	CanbusClientOptions
 	TripleClient	*TripleClient
+	g 						*gocui.Gui
 }
 
 type CanbusClientOptions struct {
@@ -164,28 +165,8 @@ func (c *CanbusClient) switchToOptions(g *gocui.Gui, v *gocui.View) error {
   return nil
 }
 
-func (c *CanbusClient) showTripleInfo(g *gocui.Gui, v *gocui.View) error {
-
-	txt := c.TripleClient.GetInfo()
-
-	maxX, maxY := g.Size()
-
-	if v, err := g.SetView("msg", maxX/2-15, maxY/2-5, maxX/2+15, maxY/2+5); err != nil {
-
-		if err != gocui.ErrorUnkView {
-			return err
-		}
-
-		v.Clear()
-		v.SetOrigin(-10,-10)
-		v.SetCursor(20,20)
-		fmt.Fprint(v, txt)
-
-		if err := g.SetCurrentView("msg"); err != nil {
-			return err
-		}
-	}
-
+func (c *CanbusClient) requestTripleInfo(g *gocui.Gui, v *gocui.View) error {
+	c.TripleClient.RequestInfo()
 	return nil
 }
 
@@ -212,7 +193,7 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlI, gocui.ModNone, c.showTripleInfo); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlI, gocui.ModNone, c.requestTripleInfo); err != nil {
 		return err
 	}
 
@@ -235,27 +216,46 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 	return nil
 }
 
-func (c *CanbusClient) initChannel(v *gocui.View) {
+func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
+	for {
+    canPacket := <- ch
+		log.Printf("%+v", canPacket)
+		fmt.Fprintf(c.mainView, "%+v", canPacket)
+  }
+}
 
-	ch := c.TripleClient.OpenChannel()
+
+func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 
 	for {
-		buf := make([]byte, 64)
+		info := <- ch
 
-    entry := <- ch
-    copy(buf[0:], entry)
+		txt := fmt.Sprintf("\n\n  Event:    %s\n  Name:     %s\n  Version:  %s\n  Memory:   %s\n",
+			info.Event, info.Name, info.Version, info.Memory)
 
-		log.Println(buf)
+		maxX, maxY := c.g.Size()
 
-		// fmt.Fprintf(v, "%+v", buf)
-  }
+		if v, err := c.g.SetView("msg", maxX/2-15, maxY/2-5, maxX/2+15, maxY/2+5); err != nil {
+
+			if err != gocui.ErrorUnkView {
+				panic(err)
+			}
+
+			v.SetOrigin(-10,-10)
+			v.SetCursor(20,20)
+
+			fmt.Fprint(v, txt)
+
+			if err := c.g.SetCurrentView("msg"); err != nil {
+				panic(err)
+			}
+		}
+	}
 }
 
 func main() {
 
 	var err error
-	// var port string
-	// flag.StringVar(&port, "port", "", "USB port Canbus Triple is connected to")
 
 	f, err := os.OpenFile("./canbustriple.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {
@@ -278,7 +278,11 @@ func main() {
   c.options.bus2Enabled = false
   c.options.bus3Enabled = false
 
+	canCh, infoCh := c.TripleClient.OpenChannels()
+
+
 	g := gocui.NewGui()
+	c.g = g
 
 	if err := g.Init(); err != nil {
 		panic(err)
@@ -294,7 +298,10 @@ func main() {
 	g.SelFgColor = gocui.ColorBlack
 
   g.SetCurrentView("main")
-	go c.initChannel(c.mainView)
+
+	go c.initCanChannel(canCh)
+	go c.initInfoChannel(infoCh)
+
 	err = g.MainLoop()
 
   if err != nil && err != gocui.Quit {
