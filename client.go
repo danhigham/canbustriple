@@ -49,10 +49,14 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
     c.writeOptionsPane()
   }
 
-	if c.mainView, err = g.SetView("main", 20, -1, maxX, maxY-2); err != nil &&
-		err != gocui.ErrorUnkView {
-		return err
-	}
+	if c.mainView, err = g.SetView("main", 20, -1, maxX, maxY-2); err != nil {
+		if err != gocui.ErrorUnkView {
+			return err
+		}
+
+		c.mainView.Autoscroll = true
+
+  }
 
 	if v, err := g.SetView("cmdline", -1, maxY-2, maxX, maxY); err != nil {
     if err != gocui.ErrorUnkView {
@@ -220,7 +224,10 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 	for {
     canPacket := <- ch
 		log.Printf("%+v", canPacket)
-		fmt.Fprintf(c.mainView, "%+v", canPacket)
+		c.mainView.SetCursor(20,20)
+		s := fmt.Sprintf("%+v\n", canPacket)
+		c.mainView.Write([]byte(s))
+		c.g.Flush()
   }
 }
 
