@@ -8,11 +8,13 @@ import (
   "strings"
   "strconv"
   "encoding/binary"
-  // "time"
+  "time"
   "github.com/tarm/serial"
 )
 
 func main() {
+
+  fmt.Printf("%s\t\t%s", "a", "b")
 
   cfg := &serial.Config{Name: "/dev/ptyp6", Baud: 115200}
   port, err := serial.OpenPort(cfg)
@@ -47,7 +49,7 @@ func main() {
         buf[i] = b[0]
       }
 
-      // time.Sleep(1*time.Second)
+      time.Sleep(100*time.Millisecond)
       port.Write(buf)
 
       fmt.Printf("%+v\n", buf)

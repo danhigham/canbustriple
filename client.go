@@ -63,13 +63,13 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 		  return err
     }
 
-		fmt.Fprint(v, "O: Set Options\t\t\t")
-    fmt.Fprint(v, "P: Pause\t\t\t")
-    fmt.Fprint(v, "V: Compact\t\t\t")
-    fmt.Fprint(v, "M: Send CAN Message\t\t\t")
-    fmt.Fprint(v, "F: Add Filter\t\t\t")
-    fmt.Fprint(v, "I: Get Sys Info\t\t\t")
-    fmt.Fprint(v, "C: Quit\t\t\t")
+		fmt.Fprintf(v, "O: Set Options\t\t\t")
+    fmt.Fprintf(v, "P: Pause\t\t\t")
+    fmt.Fprintf(v, "V: Compact\t\t\t")
+    fmt.Fprintf(v, "M: Send CAN Message\t\t\t")
+    fmt.Fprintf(v, "F: Add Filter\t\t\t")
+    fmt.Fprintf(v, "I: Get Sys Info\t\t\t")
+    fmt.Fprintf(v, "C: Quit\t\t\t")
   }
 
   return nil
@@ -224,9 +224,13 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 	for {
     canPacket := <- ch
 		log.Printf("%+v", canPacket)
-		c.mainView.SetCursor(20,20)
-		s := fmt.Sprintf("%+v\n", canPacket)
-		c.mainView.Write([]byte(s))
+
+		// format packet for display
+		// s := fmt.Sprintf("%d\x09\x09%+v\t\t%s\n", canPacket.Bus, canPacket.Data, string(canPacket.Data))
+		// c.mainView.Write([]byte(s))
+		fmt.Fprint(c.mainView, "hello")
+		fmt.Fprint(c.mainView, "\t")
+		fmt.Fprintf(c.mainView, "%+v\n", canPacket)
 		c.g.Flush()
   }
 }
