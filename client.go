@@ -8,6 +8,7 @@ import (
 	"os"
 	"log"
   "fmt"
+	"strings"
 	"github.com/jroimartin/gocui"
 )
 
@@ -24,6 +25,15 @@ type CanbusClientOptions struct {
   bus1Enabled bool
   bus2Enabled bool
   bus3Enabled bool
+}
+
+func PadRight(str, pad string, length int) string {
+    for {
+        str += pad
+        if len(str) > length {
+            return str[0:length]
+        }
+    }
 }
 
 func (c *CanbusClient) layout(g *gocui.Gui) error {
@@ -56,6 +66,17 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 
 		c.mainView.Autoscroll = true
 
+  }
+
+	if v, err := g.SetView("headers", 20, -1, maxX, 1); err != nil {
+    if err != gocui.ErrorUnkView {
+		  return err
+    }
+
+		fmt.Fprintf(v, PadRight(" Bus", " ", 13))
+		fmt.Fprintf(v, PadRight("| Message ID", " ", 14))
+		fmt.Fprintf(v, PadRight("| Data", " ", 76))
+		fmt.Fprintf(v, PadRight("| Length", " ", 12))
   }
 
 	if v, err := g.SetView("cmdline", -1, maxY-2, maxX, maxY); err != nil {
@@ -223,14 +244,27 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 	for {
     canPacket := <- ch
-		log.Printf("%+v", canPacket)
+
+
+		bus := fmt.Sprintf("%v", canPacket.Bus)
+		messageId := fmt.Sprintf("%v", canPacket.MessageID)
+		length := fmt.Sprintf("%v", canPacket.Length)
+		data := fmt.Sprintf("%v", canPacket.Data)
+		dataString := string(canPacket.Data[:canPacket.Length])
+		dataString = strings.Replace(dataString, "\x00", ".", 0)
 
 		// format packet for display
-		// s := fmt.Sprintf("%d\x09\x09%+v\t\t%s\n", canPacket.Bus, canPacket.Data, string(canPacket.Data))
-		// c.mainView.Write([]byte(s))
-		fmt.Fprint(c.mainView, "hello")
-		fmt.Fprint(c.mainView, "\t")
-		fmt.Fprintf(c.mainView, "%+v\n", canPacket)
+		s := fmt.Sprintf(
+			" %s| %s| %s| %s| %s",
+			PadRight(bus, " ", 12),
+			PadRight(messageId, " ", 12),
+			PadRight(data, " ", 48),
+			PadRight(dataString, " ", 24),
+			PadRight(length, " ", 12))
+
+		c.mainView.Write([]byte(s))
+		c.mainView.Write([]byte("\n"))
+		log.Println(s)
 		c.g.Flush()
   }
 }
