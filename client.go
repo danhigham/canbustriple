@@ -19,6 +19,7 @@ type CanbusClient struct {
   options     	CanbusClientOptions
 	TripleClient	*TripleClient
 	g 						*gocui.Gui
+	PauseOutput		bool
 }
 
 type CanbusClientOptions struct {
@@ -98,6 +99,11 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.Quit
+}
+
+func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
+	c.PauseOutput = !c.PauseOutput
+	return nil
 }
 
 func (c *CanbusClient) writeLoggingOptions() {
@@ -238,6 +244,10 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("", gocui.KeyCtrlP, gocui.ModNone, c.togglePause); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -245,27 +255,34 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 	for {
     canPacket := <- ch
 
-
 		bus := fmt.Sprintf("%v", canPacket.Bus)
 		messageId := fmt.Sprintf("%v", canPacket.MessageID)
 		length := fmt.Sprintf("%v", canPacket.Length)
-		data := fmt.Sprintf("%v", canPacket.Data)
-		dataString := string(canPacket.Data[:canPacket.Length])
-		dataString = strings.Replace(dataString, "\x00", ".", 0)
+		hexdata := make([]string, 8)
+
+		data := make([]rune, 8)
+
+		for i := 0; i< 8; i ++ {
+			hexdata[i] = fmt.Sprintf("%02X", canPacket.Data[i])
+			if canPacket.Data[i] > 31 && canPacket.Data[i] < 127 {
+				data[i] = rune(canPacket.Data[i])
+			} else {
+				data[i] = '.'
+			}
+		}
 
 		// format packet for display
 		s := fmt.Sprintf(
 			" %s| %s| %s| %s| %s",
 			PadRight(bus, " ", 12),
 			PadRight(messageId, " ", 12),
-			PadRight(data, " ", 48),
-			PadRight(dataString, " ", 24),
+			PadRight(strings.Join(hexdata, " "), " ", 48),
+			PadRight(string(data), " ", 24),
 			PadRight(length, " ", 12))
 
 		c.mainView.Write([]byte(s))
 		c.mainView.Write([]byte("\n"))
-		log.Println(s)
-		c.g.Flush()
+		if !c.PauseOutput { c.g.Flush() }
   }
 }
 
@@ -322,9 +339,9 @@ func main() {
   c.options.bus1Enabled = false
   c.options.bus2Enabled = false
   c.options.bus3Enabled = false
+	c.PauseOutput = false
 
 	canCh, infoCh := c.TripleClient.OpenChannels()
-
 
 	g := gocui.NewGui()
 	c.g = g

@@ -49,7 +49,7 @@ func main() {
         buf[i] = b[0]
       }
 
-      time.Sleep(100*time.Millisecond)
+      time.Sleep(10*time.Millisecond)
       port.Write(buf)
 
       fmt.Printf("%+v\n", buf)

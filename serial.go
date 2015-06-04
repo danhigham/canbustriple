@@ -67,7 +67,7 @@ func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
 
         if err != nil { panic(err) }
 
-        p := CANPacket { Bus: buf[1], Mid0: buf[2], Mid1: buf[3], Data: buf[4:11], Length: buf[12], BusStatus: buf[13] }
+        p := CANPacket { Bus: buf[1], Mid0: buf[2], Mid1: buf[3], Data: buf[4:12], Length: buf[12], BusStatus: buf[13] }
         p.MessageID = (int(p.Mid0) << 8) + int(p.Mid1)
         canChannel <- p
 
