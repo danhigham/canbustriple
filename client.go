@@ -9,6 +9,7 @@ import (
 	"log"
   "fmt"
 	"strings"
+	"sort"
 	"github.com/jroimartin/gocui"
 )
 
@@ -20,6 +21,8 @@ type CanbusClient struct {
 	TripleClient	*TripleClient
 	g 						*gocui.Gui
 	PauseOutput		bool
+	Packets				map[int]CANPacket
+	ShowCompact 	bool
 }
 
 type CanbusClientOptions struct {
@@ -103,6 +106,11 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 
 func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 	c.PauseOutput = !c.PauseOutput
+	return nil
+}
+
+func (c *CanbusClient) toggleCompactView(g *gocui.Gui, v *gocui.View) error {
+	c.ShowCompact = !c.ShowCompact
 	return nil
 }
 
@@ -228,6 +236,11 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("", gocui.KeyCtrlV, gocui.ModNone, c.toggleCompactView); err != nil {
+		return err
+	}
+
+
   if err := g.SetKeybinding("side-options", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
 		return err
 	}
@@ -251,41 +264,79 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 	return nil
 }
 
+func (canPacket *CANPacket) lineEntry(compact bool) []byte {
+
+	bus := fmt.Sprintf("%v", canPacket.Bus)
+	messageId := fmt.Sprintf("%v", canPacket.MessageID)
+	length := fmt.Sprintf("%v", canPacket.Length)
+	hexdata := make([]string, 8)
+
+	data := make([]rune, 8)
+
+	for i := 0; i< 8; i ++ {
+		hexdata[i] = fmt.Sprintf("%02X", canPacket.Data[i])
+		if canPacket.Data[i] > 31 && canPacket.Data[i] < 127 {
+			data[i] = rune(canPacket.Data[i])
+		} else {
+			data[i] = '.'
+		}
+	}
+
+	// format packet for display
+	s := fmt.Sprintf(
+		" %s| %s| %s| %s| %s",
+		PadRight(bus, " ", 12),
+		PadRight(messageId, " ", 12),
+		PadRight(strings.Join(hexdata, "  "), " ", 48),
+		PadRight(string(data), " ", 24),
+		PadRight(length, " ", 12))
+
+	return []byte(s)
+}
+
 func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
+
+	c.Packets = make(map[int]CANPacket)
+
 	for {
     canPacket := <- ch
+		c.Packets[canPacket.MessageID] = canPacket
 
-		bus := fmt.Sprintf("%v", canPacket.Bus)
-		messageId := fmt.Sprintf("%v", canPacket.MessageID)
-		length := fmt.Sprintf("%v", canPacket.Length)
-		hexdata := make([]string, 8)
+		if c.ShowCompact {
 
-		data := make([]rune, 8)
+			c.mainView.Clear()
+			c.drawCompactView()
 
-		for i := 0; i< 8; i ++ {
-			hexdata[i] = fmt.Sprintf("%02X", canPacket.Data[i])
-			if canPacket.Data[i] > 31 && canPacket.Data[i] < 127 {
-				data[i] = rune(canPacket.Data[i])
-			} else {
-				data[i] = '.'
-			}
+		} else {
+
+			c.mainView.Write(canPacket.lineEntry(false))
+			c.mainView.Write([]byte("\n"))
 		}
 
-		// format packet for display
-		s := fmt.Sprintf(
-			" %s| %s| %s| %s| %s",
-			PadRight(bus, " ", 12),
-			PadRight(messageId, " ", 12),
-			PadRight(strings.Join(hexdata, " "), " ", 48),
-			PadRight(string(data), " ", 24),
-			PadRight(length, " ", 12))
-
-		c.mainView.Write([]byte(s))
-		c.mainView.Write([]byte("\n"))
 		if !c.PauseOutput { c.g.Flush() }
   }
 }
 
+func (c *CanbusClient) drawCompactView() {
+
+	// sort Keys
+
+	var keys []int
+	for k := range c.Packets {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+
+	//order packets here
+	for _, k := range keys {
+
+		p := c.Packets[k]
+		c.mainView.Write(p.lineEntry(true))
+		c.mainView.Write([]byte("\n"))
+
+	}
+
+}
 
 func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 
@@ -340,6 +391,7 @@ func main() {
   c.options.bus2Enabled = false
   c.options.bus3Enabled = false
 	c.PauseOutput = false
+	c.ShowCompact = false
 
 	canCh, infoCh := c.TripleClient.OpenChannels()
 
