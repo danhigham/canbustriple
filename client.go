@@ -10,7 +10,7 @@ import (
   "fmt"
 	"strings"
 	"sort"
-	"github.com/jroimartin/gocui"
+	"github.com/danhigham/gocui"
 )
 
 type CanbusClient struct {
@@ -89,7 +89,7 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
     }
 
 		fmt.Fprintf(v, "O: Set Options\t\t\t")
-    fmt.Fprintf(v, "P: Pause\t\t\t")
+    fmt.Fprintf(v, "Space: Pause\t\t\t")
     fmt.Fprintf(v, "V: Compact\t\t\t")
     fmt.Fprintf(v, "M: Send CAN Message\t\t\t")
     fmt.Fprintf(v, "F: Add Filter\t\t\t")
@@ -111,6 +111,14 @@ func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 
 func (c *CanbusClient) toggleCompactView(g *gocui.Gui, v *gocui.View) error {
 	c.ShowCompact = !c.ShowCompact
+
+	if c.ShowCompact {
+		// draw compact headers
+	} else {
+		// draw chronological headers
+	}
+
+	c.mainView.Clear()
 	return nil
 }
 
@@ -240,7 +248,6 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-
   if err := g.SetKeybinding("side-options", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
 		return err
 	}
@@ -257,7 +264,7 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlP, gocui.ModNone, c.togglePause); err != nil {
+	if err := g.SetKeybinding("", gocui.KeySpace, gocui.ModNone, c.togglePause); err != nil {
 		return err
 	}
 
@@ -299,18 +306,19 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 	c.Packets = make(map[int]CANPacket)
 
 	for {
+
     canPacket := <- ch
 		c.Packets[canPacket.MessageID] = canPacket
 
 		if c.ShowCompact {
-
-			c.mainView.Clear()
+			c.mainView.DirtyClear()
 			c.drawCompactView()
 
 		} else {
 
 			c.mainView.Write(canPacket.lineEntry(false))
 			c.mainView.Write([]byte("\n"))
+
 		}
 
 		if !c.PauseOutput { c.g.Flush() }
@@ -326,6 +334,8 @@ func (c *CanbusClient) drawCompactView() {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
+
+	log.Printf("Active keys %v", keys)
 
 	//order packets here
 	for _, k := range keys {
