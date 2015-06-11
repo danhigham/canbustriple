@@ -9,6 +9,7 @@ import (
 	"log"
   "fmt"
 	"strings"
+	"time"
 	"sort"
 	"github.com/danhigham/gocui"
 )
@@ -23,6 +24,7 @@ type CanbusClient struct {
 	PauseOutput		bool
 	Packets				map[int]CANPacket
 	ShowCompact 	bool
+	SelectedLine  int
 }
 
 type CanbusClientOptions struct {
@@ -31,7 +33,7 @@ type CanbusClientOptions struct {
   bus3Enabled bool
 }
 
-func PadRight(str, pad string, length int) string {
+func padRight(str, pad string, length int) string {
     for {
         str += pad
         if len(str) > length {
@@ -63,7 +65,7 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
     c.writeOptionsPane()
   }
 
-	if c.mainView, err = g.SetView("main", 20, -1, maxX, maxY-2); err != nil {
+	if c.mainView, err = g.SetView("main", 20, 1, maxX, maxY-2); err != nil {
 		if err != gocui.ErrorUnkView {
 			return err
 		}
@@ -77,10 +79,10 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 		  return err
     }
 
-		fmt.Fprintf(v, PadRight(" Bus", " ", 13))
-		fmt.Fprintf(v, PadRight("| Message ID", " ", 14))
-		fmt.Fprintf(v, PadRight("| Data", " ", 76))
-		fmt.Fprintf(v, PadRight("| Length", " ", 12))
+		fmt.Fprintf(v, padRight(" Bus", " ", 13))
+		fmt.Fprintf(v, padRight("| Message ID", " ", 14))
+		fmt.Fprintf(v, padRight("| Data", " ", 76))
+		fmt.Fprintf(v, padRight("| Length", " ", 12))
   }
 
 	if v, err := g.SetView("cmdline", -1, maxY-2, maxX, maxY); err != nil {
@@ -106,17 +108,15 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 
 func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 	c.PauseOutput = !c.PauseOutput
+	c.showAboutDialog()
 	return nil
 }
 
 func (c *CanbusClient) toggleCompactView(g *gocui.Gui, v *gocui.View) error {
 	c.ShowCompact = !c.ShowCompact
-
-	if c.ShowCompact {
-		// draw compact headers
-	} else {
-		// draw chronological headers
-	}
+	c.mainView.Highlight = c.ShowCompact
+	c.SelectedLine = 0
+	g.SetCurrentView("main")
 
 	c.mainView.Clear()
 	return nil
@@ -159,37 +159,6 @@ func (c *CanbusClient) writeOptionsPane() error {
   return nil
 }
 
-func cursorDown(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		cx, cy := v.Cursor()
-    if (cy > 4) { return nil }
-
-		if err := v.SetCursor(cx, cy+1); err != nil {
-			ox, oy := v.Origin()
-			if err := v.SetOrigin(ox, oy+1); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func cursorUp(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		ox, oy := v.Origin()
-		cx, cy := v.Cursor()
-
-    if (cy < 4) { return nil }
-
-		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
-			if err := v.SetOrigin(ox, oy-1); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func (c *CanbusClient) setOptions(g *gocui.Gui, v *gocui.View) error {
   if v != nil {
     _, cy := v.Cursor()
@@ -230,48 +199,8 @@ func delMsg(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 
-  if err := g.SetKeybinding("", gocui.KeyCtrlO, gocui.ModNone, c.switchToOptions); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlI, gocui.ModNone, c.requestTripleInfo); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlV, gocui.ModNone, c.toggleCompactView); err != nil {
-		return err
-	}
-
-  if err := g.SetKeybinding("side-options", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("side-options", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
-		return err
-	}
-
-  if err := g.SetKeybinding("side-options", gocui.KeySpace, gocui.ModNone, c.setOptions); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("msg", gocui.KeyEnter, gocui.ModNone, delMsg); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeySpace, gocui.ModNone, c.togglePause); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (canPacket *CANPacket) lineEntry(compact bool) []byte {
+func (canPacket *CANPacket) lineEntry(hideDataString bool) []byte {
 
 	bus := fmt.Sprintf("%v", canPacket.Bus)
 	messageId := fmt.Sprintf("%v", canPacket.MessageID)
@@ -289,14 +218,29 @@ func (canPacket *CANPacket) lineEntry(compact bool) []byte {
 		}
 	}
 
+	var s string
+
 	// format packet for display
-	s := fmt.Sprintf(
-		" %s| %s| %s| %s| %s",
-		PadRight(bus, " ", 12),
-		PadRight(messageId, " ", 12),
-		PadRight(strings.Join(hexdata, "  "), " ", 48),
-		PadRight(string(data), " ", 24),
-		PadRight(length, " ", 12))
+	if hideDataString {
+
+		s = fmt.Sprintf(
+			" %s| %s| %s| %s",
+			padRight(bus, " ", 9),
+			padRight(messageId, " ", 8),
+			padRight(strings.Join(hexdata, "  "), " ", 48),
+			padRight(length, " ", 10))
+
+	} else {
+
+		s = fmt.Sprintf(
+			" %s| %s| %s| %s| %s",
+			padRight(bus, " ", 12),
+			padRight(messageId, " ", 12),
+			padRight(strings.Join(hexdata, "  "), " ", 48),
+			padRight(string(data), " ", 24),
+			padRight(length, " ", 12))
+
+	}
 
 	return []byte(s)
 }
@@ -313,6 +257,7 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 		if c.ShowCompact {
 			c.mainView.DirtyClear()
 			c.drawCompactView()
+			c.mainView.SetCursor(0, c.SelectedLine)
 
 		} else {
 
@@ -325,23 +270,27 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
   }
 }
 
-func (c *CanbusClient) drawCompactView() {
-
-	// sort Keys
-
+func (c *CanbusClient) packetKeys() []int {
 	var keys []int
+
 	for k := range c.Packets {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
 
-	log.Printf("Active keys %v", keys)
+	sort.Ints(keys)
+	return keys
+}
+
+func (c *CanbusClient) drawCompactView() {
+
+	// sort Keys
+	keys := c.packetKeys()
 
 	//order packets here
 	for _, k := range keys {
 
 		p := c.Packets[k]
-		c.mainView.Write(p.lineEntry(true))
+		c.mainView.Write(p.lineEntry(false))
 		c.mainView.Write([]byte("\n"))
 
 	}
@@ -402,6 +351,7 @@ func main() {
   c.options.bus3Enabled = false
 	c.PauseOutput = false
 	c.ShowCompact = false
+	c.SelectedLine = 0
 
 	canCh, infoCh := c.TripleClient.OpenChannels()
 
@@ -422,6 +372,12 @@ func main() {
 	g.SelFgColor = gocui.ColorBlack
 
   g.SetCurrentView("main")
+
+	go func() {
+		v := c.showAboutDialog()
+		time.Sleep(2 * time.Second)
+		g.DeleteView(v.Name())
+	}()
 
 	go c.initCanChannel(canCh)
 	go c.initInfoChannel(infoCh)
