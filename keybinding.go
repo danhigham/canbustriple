@@ -50,6 +50,7 @@ func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 		return nil
 	}); err != nil { return err }
 
+
 	if err := g.SetKeybinding("main", gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 
 		// if c.SelectedLine < len(c.Packets) - 1 { c.SelectedLine ++ }

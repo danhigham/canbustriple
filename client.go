@@ -25,6 +25,7 @@ type CanbusClient struct {
 	Packets				map[int]CANPacket
 	ShowCompact 	bool
 	SelectedLine  int
+	Actions				[0]ActionButton
 }
 
 type CanbusClientOptions struct {
@@ -108,7 +109,6 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 
 func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 	c.PauseOutput = !c.PauseOutput
-	c.showAboutDialog()
 	return nil
 }
 
