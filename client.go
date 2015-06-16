@@ -34,15 +34,6 @@ type CanbusClientOptions struct {
   bus3Enabled bool
 }
 
-func padRight(str, pad string, length int) string {
-    for {
-        str += pad
-        if len(str) > length {
-            return str[0:length]
-        }
-    }
-}
-
 func (c *CanbusClient) layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
@@ -72,7 +63,7 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 		}
 
 		c.mainView.Autoscroll = true
-
+		c.mainView.Overwrite = true
   }
 
 	if v, err := g.SetView("headers", 20, -1, maxX, 1); err != nil {
@@ -86,39 +77,13 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 		fmt.Fprintf(v, padRight("| Length", " ", 12))
   }
 
-	if v, err := g.SetView("cmdline", -1, maxY-2, maxX, maxY); err != nil {
-    if err != gocui.ErrorUnkView {
-		  return err
-    }
-
-		fmt.Fprintf(v, "O: Set Options\t\t\t")
-    fmt.Fprintf(v, "Space: Pause\t\t\t")
-    fmt.Fprintf(v, "V: Compact\t\t\t")
-    fmt.Fprintf(v, "M: Send CAN Message\t\t\t")
-    fmt.Fprintf(v, "F: Add Filter\t\t\t")
-    fmt.Fprintf(v, "I: Get Sys Info\t\t\t")
-    fmt.Fprintf(v, "C: Quit\t\t\t")
-  }
+	c.createMainMenu(g)
 
   return nil
 }
 
-func quit(g *gocui.Gui, v *gocui.View) error {
-	return gocui.Quit
-}
-
 func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 	c.PauseOutput = !c.PauseOutput
-	return nil
-}
-
-func (c *CanbusClient) toggleCompactView(g *gocui.Gui, v *gocui.View) error {
-	c.ShowCompact = !c.ShowCompact
-	c.mainView.Highlight = c.ShowCompact
-	c.SelectedLine = 0
-	g.SetCurrentView("main")
-
-	c.mainView.Clear()
 	return nil
 }
 
@@ -179,11 +144,6 @@ func (c *CanbusClient) switchToOptions(g *gocui.Gui, v *gocui.View) error {
   c.optionView.SetCursor(0,3)
 
   return nil
-}
-
-func (c *CanbusClient) requestTripleInfo(g *gocui.Gui, v *gocui.View) error {
-	c.TripleClient.RequestInfo()
-	return nil
 }
 
 func delMsg(g *gocui.Gui, v *gocui.View) error {
@@ -307,7 +267,7 @@ func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 
 		maxX, maxY := c.g.Size()
 
-		if v, err := c.g.SetView("msg", maxX/2-15, maxY/2-5, maxX/2+15, maxY/2+5); err != nil {
+		if v, err := c.g.SetView("triple-info", maxX/2-15, maxY/2-5, maxX/2+15, maxY/2+5); err != nil {
 
 			if err != gocui.ErrorUnkView {
 				panic(err)
@@ -318,9 +278,11 @@ func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 
 			fmt.Fprint(v, txt)
 
-			if err := c.g.SetCurrentView("msg"); err != nil {
+			if err := c.g.SetCurrentView("triple-info"); err != nil {
 				panic(err)
 			}
+
+			c.g.Flush()
 		}
 	}
 }

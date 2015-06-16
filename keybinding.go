@@ -4,22 +4,6 @@ import	"github.com/danhigham/gocui"
 
 func (c *CanbusClient) keybindings(g *gocui.Gui) error {
 
-  if err := g.SetKeybinding("", gocui.KeyCtrlO, gocui.ModNone, c.switchToOptions); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlI, gocui.ModNone, c.requestTripleInfo); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlV, gocui.ModNone, c.toggleCompactView); err != nil {
-		return err
-	}
-
   if err := g.SetKeybinding("side-options", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
 		return err
 	}

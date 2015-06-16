@@ -3,12 +3,13 @@ package main
 import (
   "github.com/danhigham/gocui"
   "strings"
+  "bytes"
   "log"
   "fmt"
 )
 
 type ActionButton struct {
-  handler func(CANPacket)
+  handler func(*gocui.Gui, *gocui.View) error
   caption string
   shortcut gocui.Key
 }
@@ -17,26 +18,47 @@ var viewName = "action_dialog"
 
 var actions = [...]ActionButton {
   ActionButton{
-    caption: fmt.Sprintf("Log"),
+    caption: "Label",
     shortcut: gocui.KeyCtrlL,
-    handler: func(packet CANPacket){
-      log.Printf("%v", packet)
+    handler: func(g *gocui.Gui, v *gocui.View) error {
+      log.Printf("Label Packet")
+      return nil
   }},
   ActionButton{
     caption: "Ignore",
     shortcut: gocui.KeyCtrlI,
-    handler: func(packet CANPacket){
-      log.Printf("%v", packet)
+    handler: func(g *gocui.Gui, v *gocui.View) error {
+      log.Printf("Ignore Packet")
+      return nil
+  }},
+  ActionButton{
+    caption: "Send",
+    shortcut: gocui.KeyCtrlS,
+    handler: func(g *gocui.Gui, v *gocui.View) error {
+      log.Printf("Send Packet")
+      return nil
+  }},
+  ActionButton{
+    caption: "Cancel",
+    shortcut: gocui.KeyCtrlO,
+    handler: func(g *gocui.Gui, v *gocui.View) error {
+      g.DeleteView(viewName)
+      g.SetCurrentView("main")
+      return nil
   }}}
 
 func (c *CanbusClient) showActionDialog(packet CANPacket) {
+
   maxX, maxY := c.g.Size()
 
   width := 80
-  height := 15
+  height := 10
 
   if v, err := c.g.SetView(viewName, maxX/2-(width/2), maxY/2-(height/2),
     maxX/2+(width/2), maxY/2+(height/2)); err != nil {
+
+    v.Overwrite = true
+    v.Underlined = []gocui.Pos{{1, 0}, {2, 3}, {4, 5}}
 
     if err != gocui.ErrorUnkView {
       panic(err)
@@ -48,26 +70,34 @@ func (c *CanbusClient) showActionDialog(packet CANPacket) {
 		fmt.Fprint(v, padRight("| Length", " ", 10))
     fmt.Fprintf(v, "\n%s\n", strings.Repeat("-", 80))
     fmt.Fprint(v, string(packet.lineEntry(true)))
-    fmt.Fprint(v, "\n\n")
+    fmt.Fprint(v, "\n\n\n\n\n")
+
+    var btnBuffer bytes.Buffer
+    buttonWidth := 0
+
+    for i, a := range actions {
+      actions[i].caption = fmt.Sprintf("[%v]", a.caption)
+      buttonWidth += len(actions[i].caption)
+    }
+
+    spc := (width - buttonWidth) / len(actions)
 
     for _, a := range actions {
-      x, y := v.Cursor()
-      log.Printf("*** %v *** %v",x ,y)
-      v.Write([]byte(a.caption))
+      pleft := padLeft(a.caption, " ", (spc / 2) + len(a.caption))
+      padded := padRight(pleft, " ", (spc / 2) + len(pleft))
 
-      v.WriteUnderlinedRune(5, 5, 'x')
-      // termbox.SetCell(5, 5, 'x', termbox.AttrUnderline, termbox.AttrUnderline)
+      btnBuffer.WriteString(padded)
     }
+
+    v.Write(btnBuffer.Bytes())
 
     if err := c.g.SetCurrentView(viewName); err != nil {
       panic(err)
     }
   }
 
-  c.g.SetKeybinding(viewName, gocui.KeyEsc, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-    c.g.DeleteView(viewName)
-    c.g.SetCurrentView(c.mainView.Name())
-    return nil
-  })
+  for _, a := range actions {
+    c.g.SetKeybinding(viewName, a.shortcut, gocui.ModNone, a.handler)
+  }
 
 }
