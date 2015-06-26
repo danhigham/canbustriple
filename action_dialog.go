@@ -40,10 +40,11 @@ var actions = [...]ActionButton {
   }},
   ActionButton{
     caption: "Cancel",
-    shortcut: gocui.KeyCtrlO,
+    shortcut: gocui.KeyCtrlC,
     handler: func(g *gocui.Gui, v *gocui.View) error {
       g.DeleteView(viewName)
       g.SetCurrentView("main")
+      // g.Flush()
       return nil
   }}}
 
@@ -58,7 +59,7 @@ func (c *CanbusClient) showActionDialog(packet CANPacket) {
     maxX/2+(width/2), maxY/2+(height/2)); err != nil {
 
     v.Overwrite = true
-    v.Underlined = []gocui.Pos{{1, 0}, {2, 3}, {4, 5}}
+    v.Underlined = []gocui.Pos{{8, 7}, {28, 7}, {49, 7}, {68, 7}}
 
     if err != gocui.ErrorUnkView {
       panic(err)
@@ -76,7 +77,7 @@ func (c *CanbusClient) showActionDialog(packet CANPacket) {
     buttonWidth := 0
 
     for i, a := range actions {
-      actions[i].caption = fmt.Sprintf("[%v]", a.caption)
+      actions[i].caption = fmt.Sprintf("%v", a.caption)
       buttonWidth += len(actions[i].caption)
     }
 

@@ -14,7 +14,7 @@ import (
 
 func main() {
 
-  cfg := &serial.Config{Name: "/dev/ptyp6", Baud: 115200}
+  cfg := &serial.Config{Name: "/dev/ptyp5", Baud: 115200}
   port, err := serial.OpenPort(cfg)
 
   file, err := os.Open("./canbuslog")

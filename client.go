@@ -35,6 +35,7 @@ type CanbusClientOptions struct {
 }
 
 func (c *CanbusClient) layout(g *gocui.Gui) error {
+
 	maxX, maxY := g.Size()
 
   var err error
@@ -58,12 +59,23 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
   }
 
 	if c.mainView, err = g.SetView("main", 20, 1, maxX, maxY-2); err != nil {
+
 		if err != gocui.ErrorUnkView {
 			return err
 		}
 
 		c.mainView.Autoscroll = true
 		c.mainView.Overwrite = true
+
+		// Initialise Canbus Triple connection
+		err, canCh, infoCh := c.TripleClient.OpenChannels()
+
+		go c.initCanChannel(canCh)
+		go c.initInfoChannel(infoCh)
+
+		if err != nil {
+			return gocui.Quit
+		}
   }
 
 	if v, err := g.SetView("headers", 20, -1, maxX, 1); err != nil {
@@ -315,17 +327,24 @@ func main() {
 	c.ShowCompact = false
 	c.SelectedLine = 0
 
-	canCh, infoCh := c.TripleClient.OpenChannels()
-
 	g := gocui.NewGui()
 	c.g = g
 
 	if err := g.Init(); err != nil {
 		panic(err)
 	}
+
 	defer g.Close()
 
 	g.SetLayout(c.layout)
+
+	go func() {
+		v := c.showAboutDialog()
+		time.Sleep(2 * time.Second)
+		g.DeleteView(v.Name())
+		g.Flush()
+	}()
+
   if err := c.keybindings(g); err != nil {
 		panic(err)
 	}
@@ -335,18 +354,11 @@ func main() {
 
   g.SetCurrentView("main")
 
-	go func() {
-		v := c.showAboutDialog()
-		time.Sleep(2 * time.Second)
-		g.DeleteView(v.Name())
-	}()
-
-	go c.initCanChannel(canCh)
-	go c.initInfoChannel(infoCh)
-
 	err = g.MainLoop()
 
   if err != nil && err != gocui.Quit {
 		panic(err)
 	}
+
+	fmt.Println("Hello")
 }

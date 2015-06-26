@@ -28,7 +28,7 @@ type TripleClient struct {
   port      *serial.Port
 }
 
-func (c *TripleClient) ensureConnection() {
+func (c *TripleClient) ensureConnection() error {
   if c.port == nil {
 
     var err error
@@ -37,17 +37,44 @@ func (c *TripleClient) ensureConnection() {
     c.port, err = serial.OpenPort(cfg)
 
     if err != nil {
-      panic(err)
+      return err
     }
-
   }
+  
+  return nil
 }
 
-func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
-  c.ensureConnection()
+func (c *TripleClient) peekConnection() error {
+
+  reader := bufio.NewReader(c.port)
+  _, err := reader.Peek(1)
+
+  if err != nil {
+    return err
+  }
+
+  return nil
+}
+
+
+func (c* TripleClient) OpenChannels() (error, chan CANPacket, chan TripleInfo) {
 
   var canChannel = make(chan CANPacket)
   var infoChannel = make(chan TripleInfo)
+
+  err := c.ensureConnection()
+
+  if err != nil {
+    c.port.Close()
+    return err, nil, nil
+  }
+
+  err = c.peekConnection()
+
+  if err != nil {
+    c.port.Close()
+    return err, nil, nil
+  }
 
   go func() {
 
@@ -57,6 +84,7 @@ func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
       m, err := reader.Peek(1)
 
       if err != nil {
+        c.port.Close()
         panic(err)
       }
 
@@ -65,7 +93,10 @@ func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
         buf := make([]byte, 14)
         _, err := reader.Read(buf)
 
-        if err != nil { panic(err) }
+        if err != nil {
+          c.port.Close()
+          panic(err)
+        }
 
         p := CANPacket { Bus: buf[1], Mid0: buf[2], Mid1: buf[3], Data: buf[4:12], Length: buf[12], BusStatus: buf[13] }
         p.MessageID = (int(p.Mid0) << 8) + int(p.Mid1)
@@ -75,14 +106,20 @@ func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
 
         line, err := reader.ReadBytes('\x0a')
 
-        if err != nil { panic(err) }
+        if err != nil {
+          c.port.Close()
+          panic(err)
+        }
 
         jsobj := line[:len(line)]
 
         var info TripleInfo
         err = json.Unmarshal(jsobj, &info)
 
-        if err != nil { panic(err) }
+        if err != nil {
+          c.port.Close()
+          panic(err)
+        }
 
         infoChannel <- info
 
@@ -90,7 +127,7 @@ func (c* TripleClient) OpenChannels() (chan CANPacket, chan TripleInfo) {
     }
   }()
 
-  return canChannel, infoChannel
+  return nil, canChannel, infoChannel
 }
 
 func (c *TripleClient) RequestInfo() {
