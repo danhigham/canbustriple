@@ -5,58 +5,65 @@
 package main
 
 import (
-	"os"
+	"fmt"
 	"log"
-  "fmt"
+	"os"
+	"sort"
 	"strings"
 	"time"
-	"sort"
+
 	"github.com/danhigham/gocui"
 )
 
 type CanbusClient struct {
-  filterView  	*gocui.View
-  optionView  	*gocui.View
-  mainView    	*gocui.View
-  options     	CanbusClientOptions
-	TripleClient	*TripleClient
-	g 						*gocui.Gui
-	PauseOutput		bool
-	Packets				map[int]CANPacket
-	ShowCompact 	bool
-	SelectedLine  int
-	Actions				[0]ActionButton
+	filterView   *gocui.View
+	optionView   *gocui.View
+	mainView     *gocui.View
+	options      CanbusClientOptions
+	TripleClient *TripleClient
+	g            *gocui.Gui
+	ShowAbout    bool
+	PauseOutput  bool
+	Packets      map[int]CANPacket
+	ShowCompact  bool
+	SelectedLine int
+	Actions      [0]ActionButton
 }
 
 type CanbusClientOptions struct {
-  bus1Enabled bool
-  bus2Enabled bool
-  bus3Enabled bool
+	bus1Enabled bool
+	bus2Enabled bool
+	bus3Enabled bool
 }
 
 func (c *CanbusClient) layout(g *gocui.Gui) error {
 
+	if c.ShowAbout {
+		c.showAboutDialog()
+		return nil
+	}
+
 	maxX, maxY := g.Size()
 
-  var err error
+	var err error
 
 	if c.filterView, err = g.SetView("side-filters", -1, -1, 20, 10); err != nil {
 		if err != gocui.ErrorUnkView {
-		  return err
-    }
+			return err
+		}
 
-    fmt.Fprint(c.filterView, "Active Filters\n-------------------\n")
+		fmt.Fprint(c.filterView, "Active Filters\n-------------------\n")
 
-  }
+	}
 
-  if c.optionView, err = g.SetView("side-options", -1, 10, 20, maxY-2); err != nil {
+	if c.optionView, err = g.SetView("side-options", -1, 10, 20, maxY-2); err != nil {
 		if err != gocui.ErrorUnkView {
-		  return err
-    }
+			return err
+		}
 
-    c.optionView.Highlight = true
-    c.writeOptionsPane()
-  }
+		c.optionView.Highlight = true
+		c.writeOptionsPane()
+	}
 
 	if c.mainView, err = g.SetView("main", 20, 1, maxX, maxY-2); err != nil {
 
@@ -76,22 +83,22 @@ func (c *CanbusClient) layout(g *gocui.Gui) error {
 		if err != nil {
 			return gocui.Quit
 		}
-  }
+	}
 
 	if v, err := g.SetView("headers", 20, -1, maxX, 1); err != nil {
-    if err != gocui.ErrorUnkView {
-		  return err
-    }
+		if err != gocui.ErrorUnkView {
+			return err
+		}
 
 		fmt.Fprintf(v, padRight(" Bus", " ", 13))
 		fmt.Fprintf(v, padRight("| Message ID", " ", 14))
 		fmt.Fprintf(v, padRight("| Data", " ", 76))
 		fmt.Fprintf(v, padRight("| Length", " ", 12))
-  }
+	}
 
 	c.createMainMenu(g)
 
-  return nil
+	return nil
 }
 
 func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
@@ -101,61 +108,81 @@ func (c *CanbusClient) togglePause(g *gocui.Gui, v *gocui.View) error {
 
 func (c *CanbusClient) writeLoggingOptions() {
 	if c.options.bus1Enabled {
-		c.TripleClient.SetBus(0x01,0x01)
+		c.TripleClient.SetBus(0x01, 0x01)
 	} else {
-		c.TripleClient.SetBus(0x01,0x00)
+		c.TripleClient.SetBus(0x01, 0x00)
 	}
 	if c.options.bus2Enabled {
-		c.TripleClient.SetBus(0x02,0x01)
+		c.TripleClient.SetBus(0x02, 0x01)
 	} else {
-		c.TripleClient.SetBus(0x02,0x00)
+		c.TripleClient.SetBus(0x02, 0x00)
 	}
 	if c.options.bus3Enabled {
-		c.TripleClient.SetBus(0x03,0x01)
+		c.TripleClient.SetBus(0x03, 0x01)
 	} else {
-		c.TripleClient.SetBus(0x03,0x00)
+		c.TripleClient.SetBus(0x03, 0x00)
 	}
 }
 
 func (c *CanbusClient) writeOptionsPane() error {
-  v := c.optionView
-  v.Clear()
+	v := c.optionView
+	v.Clear()
 
-  fmt.Fprint(v, "Options\n-------------------\n")
+	fmt.Fprint(v, "Options\n-------------------\n")
 
-  fmt.Fprintf(v, "\n%s%+12s", "Bus 1", "")
-  if c.options.bus1Enabled { fmt.Fprint(v, "\u2714") } else { fmt.Fprint(v, " ") }
-  fmt.Fprintf(v, "\n%s%+12s", "Bus 2", "")
-  if c.options.bus2Enabled { fmt.Fprint(v, "\u2714") } else { fmt.Fprint(v, " ") }
-  fmt.Fprintf(v, "\n%s%+12s", "Bus 3", "")
-  if c.options.bus3Enabled { fmt.Fprint(v, "\u2714") } else { fmt.Fprint(v, " ") }
+	fmt.Fprintf(v, "\n%s%+12s", "Bus 1", "")
+	if c.options.bus1Enabled {
+		fmt.Fprint(v, "\u2714")
+	} else {
+		fmt.Fprint(v, " ")
+	}
+	fmt.Fprintf(v, "\n%s%+12s", "Bus 2", "")
+	if c.options.bus2Enabled {
+		fmt.Fprint(v, "\u2714")
+	} else {
+		fmt.Fprint(v, " ")
+	}
+	fmt.Fprintf(v, "\n%s%+12s", "Bus 3", "")
+	if c.options.bus3Enabled {
+		fmt.Fprint(v, "\u2714")
+	} else {
+		fmt.Fprint(v, " ")
+	}
 
-  _, cy := v.Cursor()
-  if (cy < 3) { v.SetCursor(0,2) }
+	_, cy := v.Cursor()
+	if cy < 3 {
+		v.SetCursor(0, 2)
+	}
 
-  return nil
+	return nil
 }
 
 func (c *CanbusClient) setOptions(g *gocui.Gui, v *gocui.View) error {
-  if v != nil {
-    _, cy := v.Cursor()
+	if v != nil {
+		_, cy := v.Cursor()
 
-    if cy == 3 { c.options.bus1Enabled = !c.options.bus1Enabled }
-    if cy == 4 { c.options.bus2Enabled = !c.options.bus2Enabled }
-    if cy == 5 { c.options.bus3Enabled = !c.options.bus3Enabled }
+		if cy == 3 {
+			c.options.bus1Enabled = !c.options.bus1Enabled
+		}
+		if cy == 4 {
+			c.options.bus2Enabled = !c.options.bus2Enabled
+		}
+		if cy == 5 {
+			c.options.bus3Enabled = !c.options.bus3Enabled
+		}
 
-    c.writeOptionsPane()
+		c.writeOptionsPane()
 		c.writeLoggingOptions()
-  }
+	}
 
-  return nil
+	return nil
 }
 
 func (c *CanbusClient) switchToOptions(g *gocui.Gui, v *gocui.View) error {
-  g.SetCurrentView("side-options")
-  c.optionView.SetCursor(0,3)
+	g.SetCurrentView("side-options")
+	c.optionView.SetCursor(0, 3)
 
-  return nil
+	return nil
 }
 
 func delMsg(g *gocui.Gui, v *gocui.View) error {
@@ -171,7 +198,6 @@ func delMsg(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-
 func (canPacket *CANPacket) lineEntry(hideDataString bool) []byte {
 
 	bus := fmt.Sprintf("%v", canPacket.Bus)
@@ -181,7 +207,7 @@ func (canPacket *CANPacket) lineEntry(hideDataString bool) []byte {
 
 	data := make([]rune, 8)
 
-	for i := 0; i< 8; i ++ {
+	for i := 0; i < 8; i++ {
 		hexdata[i] = fmt.Sprintf("%02X", canPacket.Data[i])
 		if canPacket.Data[i] > 31 && canPacket.Data[i] < 127 {
 			data[i] = rune(canPacket.Data[i])
@@ -223,7 +249,7 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 
 	for {
 
-    canPacket := <- ch
+		canPacket := <-ch
 		c.Packets[canPacket.MessageID] = canPacket
 
 		if c.ShowCompact {
@@ -238,8 +264,10 @@ func (c *CanbusClient) initCanChannel(ch chan CANPacket) {
 
 		}
 
-		if !c.PauseOutput { c.g.Flush() }
-  }
+		if !c.PauseOutput {
+			c.g.Flush()
+		}
+	}
 }
 
 func (c *CanbusClient) packetKeys() []int {
@@ -272,7 +300,7 @@ func (c *CanbusClient) drawCompactView() {
 func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 
 	for {
-		info := <- ch
+		info := <-ch
 
 		txt := fmt.Sprintf("\n\n  Event:    %s\n  Name:     %s\n  Version:  %s\n  Memory:   %s\n",
 			info.Event, info.Name, info.Version, info.Memory)
@@ -285,8 +313,8 @@ func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 				panic(err)
 			}
 
-			v.SetOrigin(-10,-10)
-			v.SetCursor(20,20)
+			v.SetOrigin(-10, -10)
+			v.SetCursor(20, 20)
 
 			fmt.Fprint(v, txt)
 
@@ -303,9 +331,9 @@ func main() {
 
 	var err error
 
-	f, err := os.OpenFile("./canbustriple.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	f, err := os.OpenFile("./canbustriple.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-	    panic(fmt.Sprintf("error opening file: %v", err))
+		panic(fmt.Sprintf("error opening file: %v", err))
 	}
 	defer f.Close()
 
@@ -317,18 +345,25 @@ func main() {
 		panic("Port not specified!")
 	}
 
-  tc := &TripleClient {PortSpec: port}
-	c := &CanbusClient {TripleClient: tc}
+	tc := &TripleClient{PortSpec: port}
+	c := &CanbusClient{TripleClient: tc}
 
-  c.options.bus1Enabled = false
-  c.options.bus2Enabled = false
-  c.options.bus3Enabled = false
+	c.options.bus1Enabled = false
+	c.options.bus2Enabled = false
+	c.options.bus3Enabled = false
 	c.PauseOutput = false
 	c.ShowCompact = false
 	c.SelectedLine = 0
+	c.ShowAbout = true
 
 	g := gocui.NewGui()
 	c.g = g
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		c.ShowAbout = false
+		g.Flush()
+	}()
 
 	if err := g.Init(); err != nil {
 		panic(err)
@@ -338,25 +373,18 @@ func main() {
 
 	g.SetLayout(c.layout)
 
-	go func() {
-		v := c.showAboutDialog()
-		time.Sleep(2 * time.Second)
-		g.DeleteView(v.Name())
-		g.Flush()
-	}()
-
-  if err := c.keybindings(g); err != nil {
+	if err := c.keybindings(g); err != nil {
 		panic(err)
 	}
 
 	g.SelBgColor = gocui.ColorGreen
 	g.SelFgColor = gocui.ColorBlack
 
-  g.SetCurrentView("main")
+	g.SetCurrentView("main")
 
 	err = g.MainLoop()
 
-  if err != nil && err != gocui.Quit {
+	if err != nil && err != gocui.Quit {
 		panic(err)
 	}
 

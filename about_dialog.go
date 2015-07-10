@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/danhigham/gocui"
-  "strings"
-  "fmt"
 )
 
 const logo string = `
@@ -47,34 +48,34 @@ ohhhhhh-     -hhhhho     'shhhhhhhhyhhhhhhs/hhhhhhhhh+'    yhhhhy 'shhhhhhhhhhhh
                                    -+ss.
 `
 
-func (c *CanbusClient) showAboutDialog() *gocui.View {
-  maxX, maxY := c.g.Size()
+func (c *CanbusClient) showAboutDialog() string {
+	maxX, maxY := c.g.Size()
 
-  var logoWithMargin string
-  var i int = -1
+	var logoWithMargin string
+	var i int = -1
 
-  if (maxX-98) / 2 < 0 {
-    logoWithMargin = logo
-  } else {
-    i = (maxX-98) / 2
-    leftMargin := strings.Repeat(" ", i)
-    logoWithMargin = strings.Replace(logo, "\n", fmt.Sprintf("\n%s", leftMargin), -1)
-  }
+	if (maxX-98)/2 < 0 {
+		logoWithMargin = logo
+	} else {
+		i = (maxX - 98) / 2
+		leftMargin := strings.Repeat(" ", i)
+		logoWithMargin = strings.Replace(logo, "\n", fmt.Sprintf("\n%s", leftMargin), -1)
+	}
 
-  if v, err := c.g.SetView("about_dialog", -1, -1, maxX, maxY); err != nil {
+	if v, err := c.g.SetView("about_dialog", -1, -1, maxX, maxY); err != nil {
 
-    if err != gocui.ErrorUnkView {
-      panic(err)
-    }
+		if err != gocui.ErrorUnkView {
+			panic(err)
+		}
 
-    fmt.Fprintf(v, logoWithMargin)
+		fmt.Fprintf(v, logoWithMargin)
 
-    if err := c.g.SetCurrentView("about_dialog"); err != nil {
-      panic(err)
-    }
+		if err := c.g.SetCurrentView("about_dialog"); err != nil {
+			panic(err)
+		}
 
-    return v
-  }
+		return "about_dialog"
+	}
 
-  return nil
+	return "about_dialog"
 }
