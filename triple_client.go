@@ -71,13 +71,13 @@ func (c *TripleClient) OpenChannels() (error, chan CANPacket, chan TripleInfo) {
 	}
 
 	// send a request for info and then peek
-	c.RequestInfo()
-	_, err = c.peekConnection()
-
-	if err != nil {
-		c.port.Close()
-		return err, nil, nil
-	}
+	// c.RequestInfo()
+	// _, err = c.peekConnection()
+	//
+	// if err != nil {
+	// 	c.port.Close()
+	// 	return err, nil, nil
+	// }
 
 	go func() {
 
@@ -90,8 +90,6 @@ func (c *TripleClient) OpenChannels() (error, chan CANPacket, chan TripleInfo) {
 				c.port.Close()
 				panic(err)
 			}
-
-			log.Printf("%v", m[0])
 
 			if m[0] == 0x03 { //CAN Packet
 
@@ -112,6 +110,7 @@ func (c *TripleClient) OpenChannels() (error, chan CANPacket, chan TripleInfo) {
 			} else if m[0] == 0x7B { //JSON
 
 				line, err := reader.ReadBytes('\x0d')
+				log.Printf("%v", line)
 
 				if err != nil {
 					c.port.Close()
@@ -123,16 +122,17 @@ func (c *TripleClient) OpenChannels() (error, chan CANPacket, chan TripleInfo) {
 				var info TripleInfo
 				err = json.Unmarshal(jsobj, &info)
 
-				if err != nil {
-					c.port.Close()
-					panic(err)
+				// if err != nil {
+				// 	c.port.Close()
+				// 	panic(err)
+				// }
+
+				if err == nil {
+					infoChannel <- info
 				}
 
-				infoChannel <- info
-
 			} else {
-				line, err := reader.ReadBytes('\x0d')
-				log.Printf("%v", line[:len(line)])
+				reader.ReadBytes('\x0d')
 
 				if err != nil {
 					c.port.Close()
@@ -156,7 +156,8 @@ func (c *TripleClient) RequestInfo() {
 
 func (c *TripleClient) SetBus(busId byte, enabled byte) {
 	c.ensureConnection()
-	_, err := c.port.Write([]byte{0x03, busId, enabled, 0x0000, 0x0000})
+	_, err := c.port.Write([]byte{0x03, busId, enabled, 0x00, 0x00, 0x00, 0x00})
+
 	if err != nil {
 		panic(err)
 	}

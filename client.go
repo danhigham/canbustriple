@@ -322,6 +322,12 @@ func (c *CanbusClient) initInfoChannel(ch chan TripleInfo) {
 				panic(err)
 			}
 
+			c.g.SetKeybinding("triple-info", gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+				g.DeleteView("triple-info")
+				g.SetCurrentView("main")
+				return nil
+			})
+
 			c.g.Flush()
 		}
 	}
@@ -348,9 +354,12 @@ func main() {
 	tc := &TripleClient{PortSpec: port}
 	c := &CanbusClient{TripleClient: tc}
 
-	c.options.bus1Enabled = false
+	c.options.bus1Enabled = true
 	c.options.bus2Enabled = false
 	c.options.bus3Enabled = false
+
+	c.writeLoggingOptions()
+
 	c.PauseOutput = false
 	c.ShowCompact = false
 	c.SelectedLine = 0
